@@ -14,6 +14,16 @@ self.addEventListener("install", (event) => {
   );
   self.skipWaiting();
 });
+ // ✅ فعّل النسخة الجديدة فورًا
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
+
+// دعم أمر SKIP_WAITING من الصفحة (لو استخدمناه)
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 // نظّف الكاشات القديمة
 self.addEventListener("activate", (event) => {
