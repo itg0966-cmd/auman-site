@@ -88,7 +88,27 @@
     <div class="chip" id="btnExport">تصدير ⤴️</div>
     <div class="chip" id="btnImport">استيراد ⤵️</div>
   </div>
-
+  <script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    if (reg.waiting) showReload();
+    reg.addEventListener('updatefound', () => {
+      const sw = reg.installing;
+      sw?.addEventListener('statechange', () => {
+        if (sw.state === 'installed' && navigator.serviceWorker.controller) showReload();
+      });
+    });
+    function showReload() {
+      const btn = document.createElement('button');
+      btn.textContent = 'تحديث متاح — اضغط لإعادة التحميل';
+      btn.style.cssText = 'position:fixed;bottom:12px;left:12px;padding:10px 14px;font-weight:700;z-index:9999';
+      btn.onclick = () => reg.waiting?.postMessage({type:'SKIP_WAITING'});
+      document.body.appendChild(btn);
+      navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
+    }
+  });
+}
+</script>
   <div class="stats"><div>
     <div class="stat">إجمالي المستحق<b id="totDue">0</b></div>
     <div class="stat">إجمالي المدفوع<b id="totPaid">0</b></div>
