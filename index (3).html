@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>إيجارات أيمن</title>
+<style>
+  :root{
+    --bg:#0f2231; --card:#122c40; --line:#2d4f6c; --field:#0f2740;
+    --ink:#fff; --muted:#cfe2ff;
+    --accent:#ffb066; --accent2:#ff9f40; --ok:#19c37d; --warn:#b63b3b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,Arial}
+  .wrap{max-width:960px;margin:14px auto;padding:12px}
+
+  .bar{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+  .chip{background:#ffe1bf;color:#2b2b2b;border:2px solid var(--accent);border-radius:14px;
+        min-height:46px;display:flex;align-items:center;justify-content:center;font-weight:800}
+  .chip:active{transform:scale(.98)}
+
+  .stats{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;margin-bottom:12px}
+  .stats>div{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .stat{background:#10314b;border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
+  .stat b{display:block;font-size:22px;margin-top:4px}
+
+  .filters{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;margin-bottom:12px;
+           display:grid;grid-template-columns:1fr 1fr 1fr 2fr;gap:10px}
+  .input,.select{width:100%;background:#0f2740;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .hint{grid-column:1/-1;color:var(--muted);font-size:12px}
+
+  .apt{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .box{background:#0f2740;border:1px solid var(--line);border-radius:10px;padding:10px}
+  .lab{color:var(--muted);font-size:12px;margin-bottom:6px}
+  .val{font-weight:800;font-size:18px}
+
+  .bill{border:2px solid var(--accent2);border-radius:14px;background:#0e2439;padding:10px;margin:8px 0}
+  .hdr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+  .tag{background:#112f49;border:1px solid var(--accent);border-radius:12px;padding:8px;text-align:center;font-weight:800}
+  .tag.span2{grid-column:1/-1}
+
+  .inline-edit{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap}
+  .pillIn{background:#0f2740;border:1px solid var(--line);border-radius:999px;padding:6px 10px;display:flex;gap:6px;align-items:center}
+  .pillIn input{border:none;background:transparent;color:var(--ink);outline:none;font:inherit;min-width:120px}
+
+  .bgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .cap{background:#ffe1bf;border:1px solid var(--accent);border-radius:12px;padding:8px;text-align:center}
+  .cap .t{color:#2b2b2b;font-size:12px;margin-bottom:4px}
+  .cap .v{color:#1a1a1a;font-weight:900}
+  .remain-line{margin-top:8px;background:#112f49;border:1px solid var(--accent);border-radius:12px;padding:8px;text-align:center}
+  .remain-line b{color:#ffefe3}
+
+  .actions{margin-top:10px;background:#0f2740;border:1px dashed var(--accent2);
+    border-radius:12px;padding:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .actions .group{display:flex;gap:8px;flex-wrap:wrap}
+  .actions .right{margin-inline-start:auto;display:flex;gap:8px;align-items:center}
+
+  .btn{background:#123a57;border:1px solid var(--line);color:var(--ink);padding:10px 14px;border-radius:10px;font-weight:800;cursor:pointer}
+  .btn:active{transform:scale(.98)}
+  .ok{background:var(--ok);color:#04301a}
+  .warn{background:var(--warn)}
+  .accent{background:#ff9f40;color:#2b2b2b}
+
+  .warn-inline{display:none}
+  @media print{
+    .bar,.filters,.actions{display:none!important}
+    .apt{break-inside:avoid}
+    .warn-inline{display:block}
+  }
+  @media(max-width:720px){ .hdr-grid{grid-template-columns:1fr 1fr} }
+  @media(max-width:560px){ .bgrid{grid-template-columns:1fr 1fr} }
+
+  /* إدخال رقم الشكاوي داخل التاج */
+  .tag input.supportIn{
+    width:120px; max-width:100%; border:none; outline:none; background:transparent;
+    color:#ffead9; font-weight:800; text-align:center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="bar">
+    <div class="chip" id="btnPrintAll">طباعة الكل 🖨️</div>
+    <div class="chip" id="btnPdfYear">PDF سنة كاملة 🗓️</div>
+    <div class="chip" id="btnExport">تصدير ⤴️</div>
+    <div class="chip" id="btnImport">استيراد ⤵️</div>
+  </div>
+
+  <div class="stats"><div>
+    <div class="stat">إجمالي المستحق<b id="totDue">0</b></div>
+    <div class="stat">إجمالي المدفوع<b id="totPaid">0</b></div>
+    <div class="stat">إجمالي المتبقي<b id="totRest">0</b></div>
+  </div></div>
+
+  <div class="filters">
+    <select id="selBuilding" class="select"></select>
+    <select id="selMonth" class="select"></select>
+    <select id="selYear" class="select"></select>
+    <input id="qName" class="input" placeholder="بحث بالاسم ..."/>
+    <div class="hint">* الشهر المختار يظهر على كل بطاقة.</div>
+  </div>
+
+  <div id="list"></div>
+</div>
+
+<script>
+/* أدوات */
+const months=['','يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const $=s=>document.querySelector(s);
+const fmt=n=>Number(n||0).toLocaleString('en-US');
+const num=v=>Number(String(v||'0').replace(/[^\d.-]/g,''))||0;
+const ym=(y,m)=>`${y}-${String(m).padStart(2,'0')}`;
+function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+
+/* قاعدة + حفظ رقم الشكاوي العام */
+const defaultDB={ unitPrice:2000,
+  buildings:[ {id:'airport',name:'عمارة المطار',apts:7}, {id:'zayed',name:'عمارة زايد',apts:12} ],
+  tenants:{}, history:{}, supportNo:'' };
+let DB=null; try{DB=JSON.parse(localStorage.getItem('ejaratDB'))}catch(_){}
+if(!DB||!DB.buildings){DB=JSON.parse(JSON.stringify(defaultDB));save(false)}
+if(DB.supportNo===undefined) DB.supportNo='';
+
+const state={ building:(DB.buildings[0]||{}).id||'airport', month:(new Date().getMonth()+1), year:(new Date().getFullYear()), q:'' }
+const B=()=>DB.buildings.find(b=>b.id===state.building)||DB.buildings[0];
+
+/* تواريخ */
+function lastDayOfMonth(y,m){ return new Date(y,m,0).getDate(); }
+function two(n){ return String(n).padStart(2,'0'); }
+function fmtDMY(d,m,y){ return `${two(d)}/${two(m)}/${y}`; }
+
+/* شهر سابق */
+function prevYM(y,m){ return m>1 ? [y,m-1] : [y-1,12]; }
+
+function ensureTenant(bid,i){ DB.tenants[bid]=DB.tenants[bid]||{}; DB.tenants[bid][i]=DB.tenants[bid][i]||{name:`مستأجر ${i}`,phone:''}; return DB.tenants[bid][i];}
+function ensureM(bid,i,y,m){ DB.history[bid]=DB.history[bid]||{}; DB.history[bid][i]=DB.history[bid][i]||{}; const k=ym(y,m); DB.history[bid][i][k]=DB.history[bid][i][k]||{}; return DB.history[bid][i][k];}
+
+/* قراءة شهر مع متأخرات مرّحلة */
+function readM(bid,i,y,m){
+  const H=(((DB.history[bid]||{})[i]||{})[ym(y,m)])||{};
+  const prev=num(H.prev), curr=num(H.curr), diff=Math.max(curr-prev,0);
+  const amount=diff*(DB.unitPrice||2000), paid=num(H.paid);
+
+  let arrears=0; const [py,pm]=prevYM(y,m);
+  const pH=(((DB.history[bid]||{})[i]||{})[ym(py,pm)])||null;
+  if(pH){
+    const pp=num(pH.prev), pc=num(pH.curr), pdiff=Math.max(pc-pp,0);
+    const pAmount=pdiff*(DB.unitPrice||2000), pPaid=num(pH.paid||0);
+    arrears=Math.max(pAmount-pPaid,0);
+  }
+
+  const totalDue=amount+arrears;
+  const remain=Math.max(totalDue-paid,0);
+  const t=(DB.tenants[bid]||{})[i]||{};
+  return {prev,curr,diff,amount,paid,arrears,totalDue,remain,date:H.date||'',note:H.note||'',t};
+}
+
+/* فلاتر */
+function renderSelectors(){
+  $('#selBuilding').innerHTML=DB.buildings.map(b=>`<option value="${b.id}" ${b.id===state.building?'selected':''}>${b.name}</option>`).join('');
+  $('#selMonth').innerHTML=Array.from({length:12},(_,i)=>`<option value="${i+1}" ${i+1===state.month?'selected':''}>${months[i+1]}</option>`).join('');
+  const Y=new Date().getFullYear();
+  $('#selYear').innerHTML=Array.from({length:7},(_,i)=>Y-3+i).map(v=>`<option value="${v}" ${v===state.year?'selected':''}>${v}</option>`).join('');
+}
+
+/* بطاقة */
+function card(i,R,T,b){
+  const yearOpts = (()=>{const Y=new Date().getFullYear();return Array.from({length:7},(_,k)=>Y-3+k).map(v=>`<option ${v===state.year?'selected':''} value="${v}">${v}</option>`).join('')})();
+  const endDay = lastDayOfMonth(state.year,state.month);
+  return `<div class="apt">
+
+    <div class="bill" id="invoice-${i}">
+      <div class="hdr-grid">
+        <div class="tag span2">
+          <div class="inline-edit">
+            <span>اسم المشترك:</span>
+            <span class="pillIn"><input class="name" data-apt="${i}" value="${esc(T.name)}" placeholder="الاسم"></span>
+            <span>رقم العداد:</span>
+            <span class="pillIn"><input class="meter" data-apt="${i}" placeholder="—"></span>
+            <span>واتساب:</span>
+            <span class="pillIn"><input class="phone" data-apt="${i}" value="${esc(T.phone||'')}" placeholder="7xxxxxxxx"></span>
+          </div>
+        </div>
+
+        <div class="tag">من: ${state.year}-${two(state.month)}-01</div>
+        <div class="tag">إلى: ${state.year}-${two(state.month)}-${two(endDay)}</div>
+
+        <!-- رقم الشكاوي قابل للتعديل -->
+        <div class="tag">
+          رقم الشكاوي:
+          <input class="supportIn support" value="${esc(DB.supportNo||'')}" placeholder="—" />
+        </div>
+      </div>
+
+      <div class="bgrid">
+        <div class="cap"><div class="t">متأخرات</div><div class="v" id="g-arr-${i}">${fmt(R.arrears)}</div></div>
+        <div class="cap"><div class="t">قيمة استهلاك الفترة</div><div class="v" id="g-period-${i}">${fmt(R.amount)}</div></div>
+        <div class="cap"><div class="t">إجمالي المستحق</div><div class="v" id="g-due-${i}">${fmt(R.totalDue)}</div></div>
+
+        <div class="cap"><div class="t">فارق القراءات</div><div class="v" id="g-diff-${i}">${fmt(R.diff)}</div></div>
+        <div class="cap"><div class="t">القراءة الحالية</div><div class="v" id="g-cur-${i}">${fmt(R.curr)}</div></div>
+        <div class="cap"><div class="t">القراءة السابقة</div><div class="v" id="g-pre-${i}">${fmt(R.prev)}</div></div>
+      </div>
+
+      <div class="remain-line">المتبقي: <b id="g-rem-${i}">${fmt(R.remain)}</b></div>
+      <div class="warn-inline" id="warn-${i}" style="color:#ff8b8b;text-align:center;font-weight:900;margin:8px 0 0">
+        يجب تسديد الفاتورة خلال اليوم، وفي حال التأخير قد تتعرض الخدمة للإيقاف.
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="box"><div class="lab">قراءة سابقة</div><input class="input prev" data-apt="${i}" value="${fmt(R.prev)}" inputmode="numeric"></div>
+      <div class="box"><div class="lab">قراءة حالية</div><input class="input curr" data-apt="${i}" value="${fmt(R.curr)}" inputmode="numeric"></div>
+    </div>
+
+    <div class="row">
+      <div class="box"><div class="lab">المتأخرات</div><div class="val" id="arr-${i}">${fmt(R.arrears)}</div></div>
+      <div class="box"><div class="lab">المبلغ المستحق (الفترة)</div><div class="val" id="amount-${i}">${fmt(R.amount)}</div></div>
+    </div>
+
+    <div class="row">
+      <div class="box"><div class="lab">الإجمالي المستحق</div><div class="val" id="due-${i}">${fmt(R.totalDue)}</div></div>
+      <div class="box"><div class="lab">المدفوع</div><input class="input paid" data-apt="${i}" value="${fmt(R.paid)}" inputmode="numeric"></div>
+    </div>
+
+    <div class="box"><div class="lab">المتبقي</div><div class="val" id="remain-${i}">${fmt(R.remain)}</div></div>
+
+    <div class="row">
+      <div class="box"><div class="lab">تاريخ السداد</div><input class="input date" type="date" data-apt="${i}" value="${R.date||''}"></div>
+      <div class="box"><div class="lab">ملاحظات</div><input class="input note" data-apt="${i}" value="${esc(R.note)}" placeholder="..."></div>
+    </div>
+
+    <div class="actions">
+      <div class="group">
+        <button class="btn ok" onclick="saveApt('${b.id}',${i})">حفظ</button>
+        <button class="btn accent" onclick="printInvoiceNew('${b.id}',${i})">طباعة فاتورة (جديد)</button>
+        <button class="btn" onclick="sendWhats('${b.id}',${i})">واتساب</button>
+        <button class="btn warn" onclick="clearPaid('${b.id}',${i})">مسح المدفوع</button>
+      </div>
+      <div class="right">
+        <label>سنة الشقة:</label>
+        <select class="select" id="y-${i}" style="width:auto;padding:6px 10px">
+          ${yearOpts}
+        </select>
+        <button class="btn" onclick="printYearApt('${b.id}',${i}, document.getElementById('y-${i}').value)">سنة للشقة 🗓️</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* رسم */
+function render(){
+  renderSelectors();
+  const b=B(); let html='',d=0,p=0,r=0;
+  for(let i=1;i<=b.apts;i++){
+    const T=ensureTenant(b.id,i);
+    if(state.q && !(T.name||'').includes(state.q)) continue;
+    const R=readM(b.id,i,state.year,state.month);
+    d+=R.totalDue; p+=R.paid; r+=R.remain;
+    html+=card(i,R,T,b);
+  }
+  $('#list').innerHTML=html;
+  $('#totDue').textContent=fmt(d);
+  $('#totPaid').textContent=fmt(p);
+  $('#totRest').textContent=fmt(r);
+  bind();
+}
+
+/* أحداث */
+function bind(){
+  document.querySelectorAll('.name').forEach(e=> e.onchange=()=>{ensureTenant(state.building,+e.dataset.apt).name=e.value.trim(); save(false)} );
+  document.querySelectorAll('.phone').forEach(e=> e.onchange=()=>{ensureTenant(state.building,+e.dataset.apt).phone=e.value.trim(); save(false)} );
+
+  // حفظ رقم الشكاوي العام من أي كرت
+  document.querySelectorAll('.support').forEach(e=>{
+    e.onchange=()=>{ DB.supportNo=e.value.trim(); save(false); };
+  });
+
+  document.querySelectorAll('.prev,.curr,.paid').forEach(e=>{
+    e.oninput=()=>recalc(+e.dataset.apt);
+    e.onblur =()=>{e.value=fmt(num(e.value))};
+    e.onchange=()=>saveApt(state.building,+e.dataset.apt,false);
+  });
+  document.querySelectorAll('.note,.date').forEach(e=> e.onchange=()=>saveApt(state.building,+e.dataset.apt,false) );
+}
+
+/* حسابات فورية */
+function prevYM(y,m){ return m>1 ? [y,m-1] : [y-1,12]; }
+function recalc(i){
+  const prev=num(document.querySelector(`.prev[data-apt="${i}"]`).value);
+  const curr=num(document.querySelector(`.curr[data-apt="${i}"]`).value);
+  const paid=num(document.querySelector(`.paid[data-apt="${i}"]`).value);
+  const diff=Math.max(curr-prev,0);
+  const amount=diff*(DB.unitPrice||2000);
+
+  const b=B(); const [py,pm]=prevYM(state.year,state.month);
+  const pr=readM(b.id,i,py,pm);
+  const arrears=pr.remain||0;
+
+  const totalDue=amount+arrears;
+  const remain=Math.max(totalDue-paid,0);
+
+  $(`#arr-${i}`).textContent=fmt(arrears);
+  $(`#amount-${i}`).textContent=fmt(amount);
+  $(`#due-${i}`).textContent=fmt(totalDue);
+  $(`#remain-${i}`).textContent=fmt(remain);
+
+  $(`#g-arr-${i}`).textContent=fmt(arrears);
+  $(`#g-period-${i}`).textContent=fmt(amount);
+  $(`#g-due-${i}`).textContent=fmt(totalDue);
+  $(`#g-diff-${i}`).textContent=fmt(diff);
+  $(`#g-cur-${i}`).textContent=fmt(curr);
+  $(`#g-pre-${i}`).textContent=fmt(prev);
+  $(`#g-rem-${i}`).textContent=fmt(remain);
+
+  const bb=B(); let D=0,P=0;
+  for(let k=1;k<=bb.apts;k++){
+    const pv=num((document.querySelector(`.prev[data-apt="${k}"]`)?.value)||0);
+    const cu=num((document.querySelector(`.curr[data-apt="${k}"]`)?.value)||0);
+    const pa=num((document.querySelector(`.paid[data-apt="${k}"]`)?.value)||0);
+    const df=Math.max(cu-pv,0)*(DB.unitPrice||2000);
+    const [ypy,ypm]=prevYM(state.year,state.month);
+    const rr=readM(bb.id,k,ypy,ypm).remain||0;
+    D+=df+rr; P+=pa;
+  }
+  $('#totDue').textContent=fmt(D);
+  $('#totPaid').textContent=fmt(P);
+  $('#totRest').textContent=fmt(Math.max(D-P,0));
+}
+
+function saveApt(bid,i,show=true){
+  const H=ensureM(bid,i,state.year,state.month);
+  H.prev=num(document.querySelector(`.prev[data-apt="${i}"]`).value);
+  H.curr=num(document.querySelector(`.curr[data-apt="${i}"]`).value);
+  H.paid=num(document.querySelector(`.paid[data-apt="${i}"]`).value);
+  H.note=document.querySelector(`.note[data-apt="${i}"]`).value;
+  H.date=document.querySelector(`.date[data-apt="${i}"]`).value;
+  save(show); recalc(i);
+}
+function clearPaid(bid,i){ const H=ensureM(bid,i,state.year,state.month); H.paid=0; save(true); recalc(i); }
+function save(show=true){ localStorage.setItem('ejaratDB',JSON.stringify(DB)); if(show){ try{Android.toast("تم الحفظ ✅")}catch(_){/* */} } }
+
+/* طباعة */
+function docHtml(title,body,subtag=''){
+  return `<!doctype html><html dir="rtl" lang="ar"><meta charset="utf-8">
+  <style>
+    body{font-family:Arial,system-ui;margin:18px;color:#111}
+    .hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .t{font-size:20px;font-weight:800}
+    .tag{background:#ffe6cc;border:1px solid #ffb066;border-radius:10px;padding:6px 10px;font-weight:700}
+    table{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border-radius:10px}
+    th,td{border:1px solid #c9c9c9;padding:8px 10px;text-align:center}
+    thead th{background:#ffb066;border-color:#e29a4f}
+    tbody tr:nth-child(even){background:#fff7ec}
+    tfoot td{font-weight:800;background:#fff1dc}
+    .note{margin-top:10px;color:#b30000;font-weight:900;text-align:center}
+    @page{margin:14mm}
+  </style>
+  <body>
+    <div class="hdr"><div class="t">${esc(title)}</div><div class="tag">${subtag || (months[state.month]+' '+state.year)}</div></div>
+    ${body}
+    <div class="note">يجب تسديد الفاتورة خلال اليوم، وفي حال التأخير قد تتعرض الخدمة للإيقاف.</div>
+  </body></html>`;
+}
+
+/* فاتورة (جديد) — يظهر فيها رقم الشكاوي */
+function printInvoiceNew(bid,i){
+  const R=readM(bid,i,state.year,state.month), T=ensureTenant(bid,i);
+  const start = fmtDMY(1, state.month, state.year);
+  const end = fmtDMY(lastDayOfMonth(state.year,state.month), state.month, state.year);
+  const range = `من: ${start} إلى: ${end}`;
+  const support = esc(DB.supportNo||'—');
+
+  const body=`<div style="margin:6px 0 6px">
+    المستأجر: <b>${esc(T.name)}</b> — شقة <b>${i}</b>
+  </div>
+  <div style="margin:0 0 10px">رقم الشكاوي: <b>${support}</b></div>
+  <table><thead><tr>
+    <th>القراءة السابقة</th><th>القراءة الحالية</th><th>فارق القراءات</th>
+    <th>قيمة الاستهلاك للواحد</th><th>قيمة استهلاك الفترة</th>
+    <th>رقم الوحدة</th><th>رصيد لكم</th><th>متأخرات</th>
+    <th>المبلغ المستحق</th>
+  </tr></thead><tbody><tr>
+    <td>${fmt(R.prev)}</td><td>${fmt(R.curr)}</td><td>${fmt(R.diff)}</td>
+    <td>${fmt(DB.unitPrice||2000)}</td><td>${fmt(R.amount)}</td>
+    <td>${i}</td><td>0</td><td>${fmt(R.arrears)}</td>
+    <td><b>${fmt(R.totalDue)}</b></td>
+  </tr></tbody></table>
+  <div style="margin-top:8px">المدفوع: <b>${fmt(R.paid)}</b> — المتبقي: <b>${fmt(R.remain)}</b></div>`;
+
+  const html=docHtml(`فاتورة مياه`,body,range);
+  try{Android.printHtml(html,`فاتورة شقة ${i}`)}catch(_){const w=open('','_blank'); if(!w){alert('اسمح بفتح النافذة'); return;} w.document.write(html); w.document.close(); w.focus(); w.print();}
+}
+
+/* سنة كاملة للشقة (بدون تغيير) */
+function printYearApt(bid,i,year){
+  year=+year||new Date().getFullYear();
+  const T=ensureTenant(bid,i);
+  let rows='',sumA=0,sumP=0,sumR=0;
+  for(let m=1;m<=12;m++){
+    const R=readM(bid,i,year,m);
+    rows+=`<tr>
+      <td>${months[m]}</td>
+      <td>${fmt(R.prev)}</td><td>${fmt(R.curr)}</td><td>${fmt(R.diff)}</td>
+      <td>${fmt(DB.unitPrice||2000)}</td><td>${fmt(R.amount)}</td>
+      <td>${fmt(R.arrears)}</td><td><b>${fmt(R.totalDue)}</b></td>
+      <td>${fmt(R.paid)}</td><td>${fmt(R.remain)}</td>
+    </tr>`;
+    sumA+=R.totalDue; sumP+=R.paid; sumR+=R.remain;
+  }
+  const body=`<div style="margin:6px 0 10px">الشقة: <b>${i}</b> — المستأجر: <b>${esc(T.name)}</b></div>
+  <table>
+    <thead>
+      <tr><th>الشهر</th><th>السابقة</th><th>الحالية</th><th>الفرق</th><th>قيمة الواحد</th><th>قيمة الفترة</th><th>متأخرات</th><th>الإجمالي المستحق</th><th>المدفوع</th><th>المتبقي</th></tr>
+    </thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr><td colspan="7">مجاميع السنة</td><td>${fmt(sumA)}</td><td>${fmt(sumP)}</td><td>${fmt(sumR)}</td></tr></tfoot>
+  </table>`;
+  const range = `من: ${fmtDMY(1,1,year)} إلى: ${fmtDMY(31,12,year)}`;
+  const html = docHtml(`تقرير سنة للشقة ${i} — ${year}`, body, range);
+  try{Android.printHtml(html,`سنة الشقة ${i} - ${year}`)}catch(_){const w=open('','_blank'); if(!w){alert('اسمح بفتح النافذة'); return;} w.document.write(html); w.document.close(); w.focus(); w.print();}
+}
+
+/* تقرير شهر لكل الشقق (كما هو) */
+function printAll(){
+  const b=B(); let rows='',D=0,P=0,Rm=0;
+  for(let i=1;i<=b.apts;i++){ const r=readM(b.id,i,state.year,state.month), t=ensureTenant(b.id,i);
+    rows+=`<tr><td>${i}</td><td>${esc(t.name)}</td><td>${fmt(r.prev)}</td><td>${fmt(r.curr)}</td><td>${fmt(r.diff)}</td><td>${fmt(r.amount)}</td><td>${fmt(r.arrears)}</td><td><b>${fmt(r.totalDue)}</b></td><td>${fmt(r.paid)}</td><td>${fmt(r.remain)}</td></tr>`;
+    D+=r.totalDue; P+=r.paid; Rm+=r.remain;
+  }
+  const body=`<table>
+    <thead><tr><th>الوحدة</th><th>الاسم</th><th>السابقة</th><th>الحالية</th><th>الفرق</th><th>الفترة</th><th>متأخرات</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr><td colspan="7">الإجمالي</td><td>${fmt(D)}</td><td>${fmt(P)}</td><td>${fmt(Rm)}</td></tr></tfoot>
+  </table>`;
+  const range = `من: ${fmtDMY(1,state.month,state.year)} إلى: ${fmtDMY(lastDayOfMonth(state.year,state.month),state.month,state.year)}`;
+  const html=docHtml(`تقارير شهر`,body,range);
+  try{Android.printHtml(html,`تقرير ${months[state.month]} ${state.year}`)}catch(_){const w=open('','_blank'); if(!w){alert('اسمح بفتح النافذة');return;} w.document.write(html); w.document.close(); w.focus(); w.print();}
+}
+
+/* واتساب */
+function sendWhats(bid,i){
+  const R=readM(bid,i,state.year,state.month), T=ensureTenant(bid,i);
+  const numStr=String(T.phone||'').replace(/\D/g,'');
+  const text=`السلام عليكم ${T.name||''}\nالمتأخرات: ${fmt(R.arrears)}\nالمستحق (الفترة): ${fmt(R.amount)}\nالإجمالي: ${fmt(R.totalDue)}\nالمدفوع: ${fmt(R.paid)}\nالمتبقي: ${fmt(R.remain)}\n${months[state.month]} ${state.year}`;
+  const url=(numStr?`https://wa.me/${numStr}?text=`:'https://wa.me/?text=')+encodeURIComponent(text);
+  const a=document.createElement('a'); a.href=url; a.target='_blank'; a.rel='noopener'; document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* تصدير / استيراد كما هي */
+$('#btnExport').onclick=()=>{
+  try{
+    const data=JSON.stringify(DB,null,2);
+    const blob=new Blob([data],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=`backup_ejarat_${Date.now()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+    alert('تم التصدير ✅');
+  }catch(e){
+    const w=open('','_blank'); if(w){ w.document.write('<pre>'+esc(JSON.stringify(DB,null,2))+'</pre>'); w.document.title='backup_ejarat.json'; }
+    else alert('تعذّر التصدير: '+e.message);
+  }
+};
+$('#btnImport').onclick=()=>{
+  const f=document.createElement('input'); f.type='file'; f.accept='application/json';
+  f.onchange=()=>{ const file=f.files[0];
+    if(!file){
+      const pasted=prompt('ألصق بيانات النسخة الاحتياطية (JSON):','');
+      if(!pasted) return;
+      try{ const incoming=JSON.parse(pasted); if(!incoming.buildings||!incoming.tenants||!incoming.history) throw new Error('بنية الملف غير صحيحة'); DB=incoming; if(DB.supportNo===undefined) DB.supportNo=''; save(false); render(); alert('تم الاستيراد ✅'); }
+      catch(e){ alert('JSON غير صالح: '+e.message); }
+      return;
+    }
+    const r=new FileReader();
+    r.onload=()=>{
+      try{
+        const incoming=JSON.parse(r.result);
+        if(!incoming || !incoming.buildings || !incoming.tenants || !incoming.history){
+          throw new Error('بنية الملف غير صحيحة');
+        }
+        if(incoming.supportNo===undefined) incoming.supportNo='';
+        DB=incoming; save(false); render();
+        alert('تم الاستيراد ✅');
+      }catch(e){ alert('ملف غير صالح: '+e.message); }
+    };
+    r.readAsText(file);
+  };
+  f.click();
+};
+
+/* أزرار عامة */
+$('#btnPrintAll').onclick=printAll;
+$('#btnPdfYear').onclick=printAll;
+$('#selBuilding').onchange=e=>{state.building=e.target.value; render();}
+$('#selMonth').onchange=e=>{state.month=+e.target.value; render();}
+$('#selYear').onchange=e=>{state.year=+e.target.value; render();}
+$('#qName').oninput=e=>{state.q=e.target.value.trim(); render();}
+
+render();
+</script>
+</body>
+</html>
