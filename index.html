@@ -84,45 +84,44 @@ a<!doctype html>
 
   <div class="bar">
     <div class="chip" id="btnPrintAll">طباعة  🖨️</div>
-    <div class="chip" id="btnPdfYear">PDFR سنة  🗓️</div>
+    <div class="chip" id="btnPdfYear">PDF سنة  🗓️</div>
     <div class="chip" id="btnExport">تصدير ⤴️</div>
     <div class="chip" id="btnImport">استيراد ⤵️</div>
   </div>
 
-  <script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').then(reg => {
-      console.log('✅ Service Worker مسجل:', reg);
+ <script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    // ✅ لما يكتشف نسخة جديدة في الخلفية
+    reg.addEventListener('updatefound', () => {
+      const sw = reg.installing;
+      if (!sw) return;
 
-      // لو فيه تحديث للـ SW
-      reg.addEventListener('updatefound', () => {
-        const newSW = reg.installing;
-        newSW.addEventListener('statechange', () => {
-          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
-            showReload(); // يظهر زر تحديث
-          }
-        });
+      sw.addEventListener('statechange', () => {
+        // صارت "installed" ويوجد كنترولر => يعني تحديث جاهز
+        if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+          // ✅ اطلب من الـ SW يتفعّل فوراً
+          if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
       });
-    }).catch(err => {
-      console.error('❌ خطأ في تسجيل Service Worker:', err);
     });
-  }
 
-  // دالة لعرض زر إعادة التحميل عند وجود تحديث
-  function showReload() {
-    const btn = document.createElement('button');
-    btn.textContent = '🔄 تحديث النسخة';
-    btn.style.cssText = 'position:fixed;bottom:12px;right:12px;padding:10px 20px;font-size:16px;z-index:9999;';
-    btn.addEventListener('click', () => {
-      if (navigator.serviceWorker.waiting) {
-        navigator.serviceWorker.waiting.postMessage({ type: 'SKIP_WAITING' });
+    // ✅ إذا تغيّر الكنترولر (يعني النسخة الجديدة استلمت)، أعد التحميل تلقائياً
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      // نتأكد ما نكرر الريلود
+      if (!window.__reloadedBySW__) {
+        window.__reloadedBySW__ = true;
+        location.reload();
       }
-      location.reload();
     });
-    document.body.appendChild(btn);
-  }
-</script>
 
+    // ✅ لو كان فيه تحديث جاهز أصلاً (waiting) من قبل ما ندخل الصفحة
+    if (reg.waiting) {
+      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    }
+  }).catch(console.error);
+}
+</script>
   <div class="stats"><div>
     <div class="stat">إجمالي المستحق<b id="totDue">0</b></div>
     <div class="stat">إجمالي المدفوع<b id="totPaid">0</b></div>
