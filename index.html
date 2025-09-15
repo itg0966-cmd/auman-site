@@ -89,28 +89,39 @@ a<!doctype html>
     <div class="chip" id="btnImport">استيراد ⤵️</div>
   </div>
 
-  <!-- تسجيل Service Worker مرة واحدة في الصفحة -->
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/auman-site/sw.js').then(reg => {
-        if (reg.waiting) showReload();
-        reg.addEventListener('updatefound', () => {
-          const sw = reg.installing;
-          sw?.addEventListener('statechange', () => {
-            if (sw.state === 'installed' && navigator.serviceWorker.controller) showReload();
-          });
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      console.log('✅ Service Worker مسجل:', reg);
+
+      // لو فيه تحديث للـ SW
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        newSW.addEventListener('statechange', () => {
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            showReload(); // يظهر زر تحديث
+          }
         });
-        function showReload() {
-          const btn = document.createElement('button');
-          btn.textContent = 'تحديث متاح — اضغط لإعادة التحميل';
-          btn.style.cssText = 'position:fixed;bottom:12px;left:12px;padding:10px 14px;font-weight:700;z-index:9999';
-          btn.onclick = () => reg.waiting?.postMessage({type:'SKIP_WAITING'});
-          document.body.appendChild(btn);
-          navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
-        }
-      }).catch(console.error);
-    }
-  </script>
+      });
+    }).catch(err => {
+      console.error('❌ خطأ في تسجيل Service Worker:', err);
+    });
+  }
+
+  // دالة لعرض زر إعادة التحميل عند وجود تحديث
+  function showReload() {
+    const btn = document.createElement('button');
+    btn.textContent = '🔄 تحديث النسخة';
+    btn.style.cssText = 'position:fixed;bottom:12px;right:12px;padding:10px 20px;font-size:16px;z-index:9999;';
+    btn.addEventListener('click', () => {
+      if (navigator.serviceWorker.waiting) {
+        navigator.serviceWorker.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+      location.reload();
+    });
+    document.body.appendChild(btn);
+  }
+</script>
 
   <div class="stats"><div>
     <div class="stat">إجمالي المستحق<b id="totDue">0</b></div>
