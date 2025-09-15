@@ -1,28 +1,42 @@
-﻿package com.ayman.waterbills
+package com.ayman.waterbills
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.net.Uri
 import android.os.Bundle
 import android.print.PrintAttributes
 import android.print.PrintDocumentAdapter
 import android.print.PrintManager
 import android.webkit.*
+import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.FileProvider
-import java.io.File
 
 class MainActivity : AppCompatActivity() {
+
+    // ✅ أضفت هذا: رابط موقعك على GitHub Pages
+    private val HOME_URL = "https://itg0966-cmd.github.io/auman-site/"
 
     private lateinit var webView: WebView
     private var pendingText: String? = null
 
+    // دعم <input type="file"> (لو احتجته من الصفحة)
+    private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
+    private val fileChooserLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
+            val resultUris = if (res.resultCode == Activity.RESULT_OK) {
+                val uri = res.data?.data
+                if (uri != null) arrayOf(uri) else emptyArray()
+            } else emptyArray()
+            fileChooserCallback?.onReceiveValue(resultUris)
+            fileChooserCallback = null
+        }
+
+    // حفظ JSON عبر SAF
     private val saveLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { res: ActivityResult ->
             if (res.resultCode == Activity.RESULT_OK) {
@@ -31,27 +45,29 @@ class MainActivity : AppCompatActivity() {
                     contentResolver.openOutputStream(uri!!)?.use { os ->
                         os.write((pendingText ?: "").toByteArray())
                     }
-                    toast("طھظ… ط§ظ„ط­ظپط¸ âœ…")
+                    toast("تم الحفظ ✅")
                 } catch (e: Exception) {
-                    toast("طھط¹ط°ظ‘ط± ط§ظ„ط­ظپط¸: ${e.message}")
+                    toast("تعذّر الحفظ: ${e.message}")
                 }
             }
             pendingText = null
         }
 
+    // فتح JSON عبر SAF
     private val openLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
             if (res.resultCode == Activity.RESULT_OK) {
                 val uri: Uri? = res.data?.data
                 try {
                     val txt = contentResolver.openInputStream(uri!!)?.reader()?.readText() ?: ""
+                    // استدعِ callback من الجافاسكربت لإسقاط البيانات داخل localStorage
                     webView.evaluateJavascript(
                         "window.onBackupImported && onBackupImported(${txt.js()})",
                         null
                     )
-                    toast("طھظ… ط§ظ„ط§ط³طھظٹط±ط§ط¯ âœ…")
+                    toast("تم الاستيراد ✅")
                 } catch (e: Exception) {
-                    toast("طھط¹ط°ظ‘ط± ط§ظ„ط§ط³طھظٹط±ط§ط¯: ${e.message}")
+                    toast("تعذّر الاستيراد: ${e.message}")
                 }
             }
         }
@@ -63,7 +79,10 @@ class MainActivity : AppCompatActivity() {
 
         webView = findViewById(R.id.webView)
         configureWebView(webView)
-        webView.loadUrl("file:///android_asset/index.html")
+
+        // ✅ بدّلت التحميل ليكون من GitHub Pages
+        webView.loadUrl(HOME_URL)
+        // كان سابقًا: webView.loadUrl("file:///android_asset/index.html")
     }
 
     private fun configureWebView(wv: WebView) {
@@ -78,8 +97,68 @@ class MainActivity : AppCompatActivity() {
             displayZoomControls = false
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         }
-        wv.webChromeClient = WebChromeClient()
 
+        // === دعم alert / confirm / prompt + اختيار ملف ===
+        wv.webChromeClient = object : WebChromeClient() {
+            override fun onJsAlert(
+                view: WebView?, url: String?, message: String?, result: JsResult?
+            ): Boolean {
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("تنبيه")
+                    .setMessage(message)
+                    .setPositiveButton("موافق") { _, _ -> result?.confirm() }
+                    .setCancelable(false)
+                    .create()
+                    .show()
+                return true
+            }
+
+            override fun onJsConfirm(
+                view: WebView?, url: String?, message: String?, result: JsResult?
+            ): Boolean {
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("تأكيد")
+                    .setMessage(message)
+                    .setPositiveButton("نعم") { _, _ -> result?.confirm() }
+                    .setNegativeButton("لا") { _, _ -> result?.cancel() }
+                    .create()
+                    .show()
+                return true
+            }
+
+            override fun onJsPrompt(
+                view: WebView?, url: String?, message: String?, defaultValue: String?, result: JsPromptResult?
+            ): Boolean {
+                val input = EditText(this@MainActivity)
+                input.setText(defaultValue ?: "")
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle(message)
+                    .setView(input)
+                    .setPositiveButton("موافق") { _, _ -> result?.confirm(input.text.toString()) }
+                    .setNegativeButton("إلغاء") { _, _ -> result?.cancel() }
+                    .create()
+                    .show()
+                return true
+            }
+
+            // دعم اختيار الملفات إن استخدمت input[type=file]
+            override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?
+            ): Boolean {
+                fileChooserCallback?.onReceiveValue(null) // الغِ أي طلب سابق
+                fileChooserCallback = filePathCallback
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "*/*"
+                }
+                fileChooserLauncher.launch(intent)
+                return true
+            }
+        }
+
+        // التعامل مع روابط واتساب/خارجية
         wv.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url?.toString() ?: return false
@@ -103,11 +182,13 @@ class MainActivity : AppCompatActivity() {
                             addCategory(Intent.CATEGORY_BROWSABLE)
                         })
                         true
-                    } else false
+                    } else {
+                        false
+                    }
                 } catch (e: ActivityNotFoundException) {
-                    toast("ظ„ط§ ظٹظˆط¬ط¯ طھط·ط¨ظٹظ‚ ظ„ظپطھط­ ط§ظ„ط±ط§ط¨ط·"); true
+                    toast("لا يوجد تطبيق لفتح الرابط"); true
                 } catch (e: Exception) {
-                    toast("طھط¹ط°ظ‘ط± ظپطھط­ ط§ظ„ط±ط§ط¨ط·: ${e.message}"); true
+                    toast("تعذّر فتح الرابط: ${e.message}"); true
                 }
             }
         }
@@ -116,7 +197,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     inner class Bridge {
-
+        // طباعة الصفحة الحالية كما هي
         @JavascriptInterface
         fun printCurrent(title: String?) {
             runOnUiThread {
@@ -129,11 +210,12 @@ class MainActivity : AppCompatActivity() {
                         .build()
                     pm.print(title ?: "Ejarat", adapter, attrs)
                 } catch (e: Exception) {
-                    toast("طھط¹ط°ظ‘ط±طھ ط§ظ„ط·ط¨ط§ط¹ط©: ${e.message}")
+                    toast("تعذّرت الطباعة: ${e.message}")
                 }
             }
         }
 
+        // طباعة HTML مُولّد (نستخدمه لفاتورة/سنة الشقة مع نطاق التاريخ)
         @JavascriptInterface
         fun printHtml(html: String, title: String?) {
             runOnUiThread {
@@ -150,7 +232,7 @@ class MainActivity : AppCompatActivity() {
                                 .build()
                             pm.print(title ?: "Ejarat", adapter, attrs)
                         } catch (e: Exception) {
-                            toast("طھط¹ط°ظ‘ط±طھ ط§ظ„ط·ط¨ط§ط¹ط©: ${e.message}")
+                            toast("تعذّرت الطباعة: ${e.message}")
                         }
                     }
                 }
@@ -158,6 +240,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // تصدير JSON عبر واجهة SAF (أفضل من التنزيل بالويب في WebView)
         @JavascriptInterface
         fun exportJson(json: String, fileName: String) {
             pendingText = json
@@ -169,6 +252,7 @@ class MainActivity : AppCompatActivity() {
             saveLauncher.launch(intent)
         }
 
+        // استيراد JSON عبر SAF
         @JavascriptInterface
         fun importJson() {
             val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -179,70 +263,23 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
-        fun shareHtmlAsImage(html: String, fileName: String?, caption: String?) {
-            runOnUiThread {
-                val offscreen = WebView(this@MainActivity)
-                configureWebView(offscreen)
+        fun toast(msg: String) = this@MainActivity.toast(msg)
 
-                offscreen.measure(
-                    WebView.MeasureSpec.makeMeasureSpec(1080, WebView.MeasureSpec.EXACTLY),
-                    WebView.MeasureSpec.makeMeasureSpec(0, WebView.MeasureSpec.UNSPECIFIED)
-                )
-                offscreen.layout(0, 0, 1080, 1)
-
-                offscreen.webViewClient = object : WebViewClient() {
-                    override fun onPageFinished(view: WebView?, url: String?) {
-                        offscreen.postDelayed({
-                            try {
-                                val contentHeight = (offscreen.contentHeight * offscreen.scale).toInt().coerceAtLeast(1)
-                                val bmp = Bitmap.createBitmap(1080, contentHeight, Bitmap.Config.ARGB_8888)
-                                val canvas = Canvas(bmp)
-                                offscreen.draw(canvas)
-
-                                val dir = File(cacheDir, "share").apply { mkdirs() }
-                                val f = File(dir, (fileName?.ifBlank { null } ?: "invoice.png"))
-                                f.outputStream().use { out -> bmp.compress(Bitmap.CompressFormat.PNG, 100, out) }
-
-                                val uri = FileProvider.getUriForFile(
-                                    this@MainActivity,
-                                    "${BuildConfig.APPLICATION_ID}.fileprovider",
-                                    f
-                                )
-
-                                val send = Intent(Intent.ACTION_SEND).apply {
-                                    type = "image/png"
-                                    putExtra(Intent.EXTRA_STREAM, uri)
-                                    putExtra(Intent.EXTRA_TEXT, caption ?: "")
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    setPackage("com.whatsapp")
-                                }
-
-                                try {
-                                    startActivity(send)
-                                } catch (_: Exception) {
-                                    send.`package` = null
-                                    startActivity(Intent.createChooser(send, "ظ…ط´ط§ط±ظƒط© ط§ظ„ظپط§طھظˆط±ط©"))
-                                }
-                            } catch (e: Exception) {
-                                toast("طھط¹ط°ظ‘ط±طھ ظ…ط´ط§ط±ظƒط© ط§ظ„طµظˆط±ط©: ${e.message}")
-                            }
-                        }, 120)
-                    }
-                }
-
-                offscreen.loadDataWithBaseURL(
-                    "file:///android_asset/",
-                    html, "text/html", "UTF-8", null
-                )
-            }
+        @JavascriptInterface
+        fun goBack() {
+            runOnUiThread { if (webView.canGoBack()) webView.goBack() else finish() }
         }
 
-        @JavascriptInterface fun toast(msg: String) = this@MainActivity.toast(msg)
-        @JavascriptInterface fun goBack() { runOnUiThread { if (webView.canGoBack()) webView.goBack() else finish() } }
-        @JavascriptInterface fun openUrl(url: String) {
+        @JavascriptInterface
+        fun openUrl(url: String) {
             runOnUiThread {
-                try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply { addCategory(Intent.CATEGORY_BROWSABLE) }) }
-                catch (e: Exception) { toast("طھط¹ط°ظ‘ط± ظپطھط­ ط§ظ„ط±ط§ط¨ط·: ${e.message}") }
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                        addCategory(Intent.CATEGORY_BROWSABLE)
+                    })
+                } catch (e: Exception) {
+                    toast("تعذّر فتح الرابط: ${e.message}")
+                }
             }
         }
     }
@@ -256,4 +293,6 @@ class MainActivity : AppCompatActivity() {
 }
 
 private fun String.js(): String = "\"" + replace("\\", "\\\\")
-    .replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r") + "\""
+    .replace("\"", "\\\"")
+    .replace("\n", "\\n")
+    .replace("\r", "\\r") + "\""
