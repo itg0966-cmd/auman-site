@@ -1,0 +1,246 @@
+﻿<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ط¥ظٹط¬ط§ط±ط§طھ ط£ظٹظ…ظ†</title>
+<style>
+  :root{--bg:#0e2740;--card:#132f4d;--chip:#1e4f86;--chip-fg:#eaf3ff;--ok:#19c37d;--txt:#e8f0ff;--muted:#a9c0df;--border:#295986}
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Arial}
+  .page{max-width:940px;margin:14px auto;padding:12px}
+  .toolbar{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:12px}
+  .chip{display:flex;align-items:center;justify-content:center;background:var(--chip);color:var(--chip-fg);border:1px solid var(--border);border-radius:14px;min-height:44px;padding:10px 8px;font-weight:700;cursor:pointer}
+  .chip.ok{background:#0d8f60}
+  .msg{display:none;margin-bottom:10px;padding:10px 12px;border-radius:10px;font-weight:700}
+  .msg.ok{background:#144d35}.msg.err{background:#5a1416}
+  .stats{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:10px;margin-bottom:12px}
+  .stats-grid{display:grid;gap:10px;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .stat{background:#0f2a47;border:1px solid var(--border);border-radius:14px;padding:12px;text-align:center}
+  .stat .label{color:var(--muted);font-size:12px;margin-bottom:6px}
+  .stat .value{font-size:22px;font-weight:800}
+  .filters{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:12px;margin-bottom:12px;display:grid;gap:10px;grid-template-columns:repeat(4,minmax(0,1fr))}
+  .select,.input{background:#0f2a47;color:var(--txt);border:1px solid var(--border);border-radius:12px;padding:10px;font-size:14px;width:100%}
+  .hint{grid-column:1/-1;color:var(--muted);font-size:12px}
+  .apt{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:12px;margin-bottom:12px;transition:background-color .2s}
+  .apt.st-full{background:#155c3a22}.apt.st-part{background:#6b4f0022}.apt.st-zero{background:#7a1d1d22}
+  .apt-head{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .pill{background:#0f2a47;border:1px solid var(--border);border-radius:999px;padding:8px 12px;font-weight:800}
+  .pill input{background:transparent;border:none;color:var(--txt);outline:none;font:inherit;width:160px}
+  .row{display:grid;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr));margin-top:8px}
+  .apt-grid{display:grid;gap:10px;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .box{background:#0f2a47;border:1px solid var(--border);border-radius:12px;padding:10px}
+  .box .label{color:var(--muted);font-size:12px;margin-bottom:6px}
+  .box .value{font-size:18px;font-weight:800}
+  .btn-row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+  button.btn{background:#0f2a47;color:var(--txt);border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer}
+  .btn.ok{background:#0d8f60}.btn.warn{background:#a23b3b}
+  @media print{.toolbar,.filters,.stats,.btn-row,.hint{display:none!important}.apt{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div id="msg" class="msg"></div>
+
+  <div class="toolbar">
+    <div class="chip" id="btnPrintAll">ط·ط¨ط§ط¹ط© ط§ظ„ظƒظ„ ًں–¨ï¸ڈ</div>
+    <div class="chip" id="btnPdfYear">PDF ط³ظ†ط© ظƒط§ظ…ظ„ط© ًں—“ï¸ڈ</div>
+    <div class="chip" id="btnExport">طھطµط¯ظٹط± â¤´ï¸ڈ</div>
+    <div class="chip" id="btnImport">ط§ط³طھظٹط±ط§ط¯ â¤µï¸ڈ</div>
+    <div class="chip ok" id="btnSaveTop">ط­ظپط¸ ًں’¾</div>
+  </div>
+
+  <div class="stats">
+    <div class="stats-grid">
+      <div class="stat"><div class="label">ط¥ط¬ظ…ط§ظ„ظٹ ط§ظ„ظ…ط³طھط­ظ‚</div><div id="totDue" class="value">0</div></div>
+      <div class="stat"><div class="label">ط¥ط¬ظ…ط§ظ„ظٹ ط§ظ„ظ…ط¯ظپظˆط¹</div><div id="totPaid" class="value">0</div></div>
+      <div class="stat"><div class="label">ط¥ط¬ظ…ط§ظ„ظٹ ط§ظ„ظ…طھط¨ظ‚ظٹ</div><div id="totRest" class="value">0</div></div>
+    </div>
+  </div>
+
+  <div class="filters">
+    <select id="selBuilding" class="select"></select>
+    <select id="selMonth" class="select"></select>
+    <select id="selYear" class="select"></select>
+    <input id="qName" class="input" placeholder="ط¨ط­ط« ط¨ط§ظ„ط§ط³ظ… ..."/>
+    <div class="hint">* ط§ظ„ط´ظ‡ط± ط§ظ„ظ…ط®طھط§ط± ظٹط¸ظ‡ط± ط¹ظ„ظ‰ ظƒظ„ ط¨ط·ط§ظ‚ط©.</div>
+  </div>
+
+  <div id="list"></div>
+</div>
+
+<script>
+const months=['','ظٹظ†ط§ظٹط±','ظپط¨ط±ط§ظٹط±','ظ…ط§ط±ط³','ط£ط¨ط±ظٹظ„','ظ…ط§ظٹظˆ','ظٹظˆظ†ظٹظˆ','ظٹظˆظ„ظٹظˆ','ط£ط؛ط³ط·ط³','ط³ط¨طھظ…ط¨ط±','ط£ظƒطھظˆط¨ط±','ظ†ظˆظپظ…ط¨ط±','ط¯ظٹط³ظ…ط¨ط±'];
+const $=s=>document.querySelector(s);
+const fmt=n=>Number(n||0).toLocaleString('en-US');
+const escapeHtml=s=>String(s||'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+
+const defaultDB={buildings:[
+  {id:'airport',name:'ط¹ظ…ط§ط±ط© ط§ظ„ظ…ط·ط§ط±',apts:7,rents:[35000,70000,65000,70000,60000,45000,45000]},
+  {id:'wadi',name:'ط¹ظ…ط§ط±ط© ظˆط§ط¯ظٹ ط£ط­ظ…ط¯',apts:9,defaultRent:44000},
+  {id:'zayed',name:'ط¹ظ…ط§ط±ط© ط²ط§ظٹط¯',apts:12,defaultRent:50000},
+  {id:'popular',name:'ط§ظ„ط¨ظٹطھ ط§ظ„ط´ط¹ط¨ظٹ',apts:1,defaultRent:35000}
+],tenants:{},history:{}};
+let DB=null; try{DB=JSON.parse(localStorage.getItem('ejaratDB'))||null;}catch(_){}
+if(!DB){DB=JSON.parse(JSON.stringify(defaultDB));localStorage.setItem('ejaratDB',JSON.stringify(DB));}
+const state={building:(DB.buildings[0]||{}).id||'airport',month:(new Date().getMonth()+1),year:(new Date().getFullYear()),q:''};
+const ym=(y,m)=>`${y}-${String(m).padStart(2,'0')}`;
+const getBuilding=id=>DB.buildings.find(b=>b.id===(id||state.building))||{};
+const ensureTenant=(bid,apt)=>(DB.tenants[bid]=DB.tenants[bid]||{},DB.tenants[bid][apt]=DB.tenants[bid][apt]||{name:`ظ…ط³طھط£ط¬ط± ${apt}`,phone:''});
+function ensureMonth(bid,apt,y,m){const k=ym(y,m);DB.history[bid]=DB.history[bid]||{};DB.history[bid][apt]=DB.history[bid][apt]||{};DB.history[bid][apt][k]=DB.history[bid][apt][k]||{};return DB.history[bid][apt][k];}
+function readMonth(bid,apt,y,m){const b=getBuilding(bid);const H=(((DB.history[bid]||{})[apt]||{})[ym(y,m)])||{};const rent=Array.isArray(b.rents)?(H.rent??b.rents[apt-1]??b.defaultRent??0):(H.rent??b.defaultRent??0);const paid=Number(H.paid||0),rest=Math.max(rent-paid,0);const t=(DB.tenants[bid]||{})[apt]||{};return {rent:Number(rent),paid,rest,full:!!H.full,toDad:!!H.toDad,dadDate:H.dadDate||'',date:H.date||'',note:H.note||'',t};}
+
+function setAptStatus(card,R){card.classList.remove('st-full','st-part','st-zero');if(R.full||R.rest===0)card.classList.add('st-full');else if(R.paid===0)card.classList.add('st-zero');else card.classList.add('st-part');}
+function renderSelectors(){
+  $('#selBuilding').innerHTML=DB.buildings.map(b=>`<option value="${b.id}" ${b.id===state.building?'selected':''}>${b.name}</option>`).join('');
+  $('#selMonth').innerHTML=Array.from({length:12},(_,i)=>`<option value="${i+1}" ${i+1===state.month?'selected':''}>${months[i+1]}</option>`).join('');
+  const Y=new Date().getFullYear();
+  $('#selYear').innerHTML=Array.from({length:7},(_,i)=>Y-3+i).map(v=>`<option value="${v}" ${v===state.year?'selected':''}>${v}</option>`).join('');
+}
+function renderList(){
+  const b=getBuilding();const list=$('#list');list.innerHTML='';let totD=0,totP=0,totR=0;
+  for(let i=1;i<=b.apts;i++){
+    const R=readMonth(b.id,i,state.year,state.month),T=ensureTenant(b.id,i);
+    if(state.q && !(T.name||'').includes(state.q)) continue;
+    totD+=R.rent;totP+=R.paid;totR+=R.rest;
+    const card=document.createElement('div');card.className='apt';
+    card.innerHTML=`
+      <div class="apt-head">
+        <span class="pill">ط´ظ‚ط© ${i}</span>
+        <span class="pill">ط§ظ„ط§ط³ظ…: <input class="name" data-apt="${i}" value="${T.name||''}"></span>
+      </div>
+      <div class="row">
+        <div class="box"><div class="label">ظˆط§طھط³ط§ط¨</div><input class="input phone" data-apt="${i}" value="${T.phone||''}" placeholder="7xxxxxxxx"/></div>
+        <div class="box"><div class="label">ط§ظ„ط´ظ‡ط±</div><div class="value">${months[state.month]} â€” ${state.year}</div></div>
+      </div>
+      <div class="apt-grid" style="margin-top:8px">
+        <div class="box"><div class="label">ط§ظ„ط¥ظٹط¬ط§ط±</div><input class="input rent" data-apt="${i}" value="${fmt(R.rent)}" inputmode="numeric"/></div>
+        <div class="box"><div class="label">ط§ظ„ظ…ط¯ظپظˆط¹</div><input class="input paid" data-apt="${i}" value="${fmt(R.paid)}" inputmode="numeric"/></div>
+        <div class="box"><div class="label">ط§ظ„ظ…طھط¨ظ‚ظٹ</div><div class="value" id="rest-${i}">${fmt(R.rest)}</div></div>
+      </div>
+      <div class="row">
+        <div class="box"><div class="label">ظ…ظ„ط§ط­ط¸ط§طھ</div><input class="input note" data-apt="${i}" value="${R.note||''}" placeholder="..."/></div>
+        <div class="box"><div class="label">طھط§ط±ظٹط® ط§ظ„ط³ط¯ط§ط¯</div><input class="input date" type="date" data-apt="${i}" value="${R.date||''}"/></div>
+      </div>
+      <div class="row">
+        <div class="box">
+          <label><input type="checkbox" class="full" data-apt="${i}" ${R.full?'checked':''}
+                 onchange="toggleFull('${b.id}', ${i}, this.checked)"/> ط¥ط°ط§ ظ…ط¯ظپظˆط¹ ظƒط§ظ…ظ„</label>
+        </div>
+        <div class="box">
+          <label><input type="checkbox" class="todad" data-apt="${i}" ${R.toDad?'checked':''}/> ط­ظˆظ‘ظ„طھ ظ„ط£ط¨ظٹ (ط§ظ„ظٹظˆظ…)</label>
+          <div class="label" style="margin-top:6px">طھط§ط±ظٹط® ط§ظ„طھط­ظˆظٹظ„: <b id="dadDate-${i}">${R.dadDate||'â€”'}</b></div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn ok" onclick="saveApt('${b.id}',${i})">ط­ظپط¸</button>
+        <button class="btn" onclick="whatsappInvoice('${b.id}',${i})">ظˆط§طھط³ط§ط¨ (طµظˆط±ط© ظپط§طھظˆط±ط©)</button>
+        <button class="btn" onclick="printInvoice('${b.id}',${i})">ط·ط¨ط§ط¹ط© ظپط§طھظˆط±ط©</button>
+        <button class="btn warn" onclick="clearPaid('${b.id}',${i})">ظ…ط³ط­ ط§ظ„ظ…ط¯ظپظˆط¹</button>
+      </div>`;
+    setAptStatus(card,R);list.appendChild(card);
+  }
+  $('#totDue').textContent=fmt(totD);$('#totPaid').textContent=fmt(totP);$('#totRest').textContent=fmt(totR);
+  bindAptEvents();
+}
+function recalcRest(apt){
+  const rent=Number(String(document.querySelector(`.rent[data-apt="${apt}"]`).value).replace(/[^\d.-]/g,''))||0;
+  const paid=Number(String(document.querySelector(`.paid[data-apt="${apt}"]`).value).replace(/[^\d.-]/g,''))||0;
+  const rest=Math.max(rent-paid,0);
+  document.querySelector(`#rest-${apt}`).textContent=fmt(rest);
+}
+function formatOnBlur(el){el.value=fmt(Number(String(el.value).replace(/[^\d.-]/g,''))||0);}
+function updateAptUI(bid,apt){
+  const R=readMonth(bid,apt,state.year,state.month);
+  const rentInp=document.querySelector(`.rent[data-apt="${apt}"]`);
+  const paidInp=document.querySelector(`.paid[data-apt="${apt}"]`);
+  if(rentInp)rentInp.value=fmt(R.rent);
+  if(paidInp)paidInp.value=fmt(R.paid);
+  const restBox=document.querySelector(`#rest-${apt}`);if(restBox)restBox.textContent=fmt(Math.max(R.rent-Number(R.paid||0),0));
+  const dadDateEl=document.querySelector(`#dadDate-${apt}`);if(dadDateEl)dadDateEl.textContent=R.dadDate||'â€”';
+  const card=document.querySelectorAll('.apt')[apt-1];setAptStatus(card,R);
+  const b=getBuilding();let d=0,p=0;for(let i=1;i<=b.apts;i++){const x=readMonth(b.id,i,state.year,state.month);d+=x.rent;p+=x.paid;}
+  $('#totDue').textContent=fmt(d);$('#totPaid').textContent=fmt(p);$('#totRest').textContent=fmt(Math.max(d-p,0));
+}
+function saveApt(bid,apt,show=true){
+  const H=ensureMonth(bid,apt,state.year,state.month);
+  H.rent=Number(String(document.querySelector(`.rent[data-apt="${apt}"]`).value).replace(/[^\d.-]/g,''))||0;
+  H.paid=Number(String(document.querySelector(`.paid[data-apt="${apt}"]`).value).replace(/[^\d.-]/g,''))||0;
+  H.note=document.querySelector(`.note[data-apt="${apt}"]`).value;
+  H.date=document.querySelector(`.date[data-apt="${apt}"]`).value;
+  const dadChk=document.querySelector(`.todad[data-apt="${apt}"]`);
+  if(dadChk && dadChk.checked){H.toDad=true;if(!H.dadDate)H.dadDate=new Date().toISOString().slice(0,10);}else{H.toDad=false;H.dadDate='';}
+  persist(show);updateAptUI(bid,apt);
+}
+function clearPaid(bid,apt){const H=ensureMonth(bid,apt,state.year,state.month);H.paid=0;H.full=false;persist(true);updateAptUI(bid,apt);}
+function styledDoc(title,body){
+  return `<!doctype html><html dir="rtl" lang="ar"><meta charset="utf-8">
+  <style>
+    :root{--c1:#0e2740;--c2:#1d3b63;--c3:#e8f0ff}
+    body{font-family:Arial,system-ui;margin:24px;color:#122}
+    .hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .title{font-size:22px;font-weight:800}
+    .tag{background:#e8f0ff;border:1px solid #b9c6e6;padding:6px 10px;border-radius:10px;font-weight:700}
+    table{width:100%;border-collapse:collapse}
+    th{background:#1d3b63;color:#fff}
+    th,td{border:1px solid #9bb0d7;padding:8px;text-align:center}
+    tbody tr:nth-child(even){background:#f4f7ff}
+    tfoot td{font-weight:800;background:#eef3ff}
+    @page{margin:18mm}
+  </style>
+  <body>
+    <div class="hdr"><div class="title">${escapeHtml(title)}</div><div class="tag">${months[state.month]} ${state.year}</div></div>
+    ${body}
+  </body></html>`;
+}
+function printInvoice(bid,apt){
+  const R=readMonth(bid,apt,state.year,state.month),T=ensureTenant(bid,apt);
+  const body=`<div style="margin:6px 0 12px;">ط§ظ„ظ…ط³طھط£ط¬ط±: <b>${escapeHtml(T.name||'')}</b> â€” ط´ظ‚ط© ${apt}</div>
+    <table><thead><tr><th>ط§ظ„ط¥ظٹط¬ط§ط±</th><th>ط§ظ„ظ…ط¯ظپظˆط¹</th><th>ط§ظ„ظ…طھط¨ظ‚ظٹ</th><th>ط­ظˆظ‘ظ„طھ ظ„ط£ط¨ظٹ</th><th>طھط§ط±ظٹط® ط§ظ„طھط­ظˆظٹظ„</th></tr></thead>
+      <tbody><tr><td>${fmt(R.rent)}</td><td>${fmt(R.paid)}</td><td>${fmt(Math.max(R.rent-R.paid,0))}</td><td>${R.toDad?'âœ”ï¸ژ':'â€”'}</td><td>${R.dadDate||'â€”'}</td></tr></tbody></table>`;
+  const html=styledDoc(`ظپط§طھظˆط±ط© ط¥ظٹط¬ط§ط±`,body);
+  try{Android.printHtml(html,`ظپط§طھظˆط±ط© ط´ظ‚ط© ${apt}`);}catch(_){window.print();}
+}
+function whatsappInvoice(bid,apt){
+  const R=readMonth(bid,apt,state.year,state.month),T=ensureTenant(bid,apt);
+  const body=`<div style="margin:6px 0 12px;">ط§ظ„ظ…ط³طھط£ط¬ط±: <b>${escapeHtml(T.name||'')}</b> â€” ط´ظ‚ط© ${apt}</div>
+    <table><thead><tr><th>ط§ظ„ط¥ظٹط¬ط§ط±</th><th>ط§ظ„ظ…ط¯ظپظˆط¹</th><th>ط§ظ„ظ…طھط¨ظ‚ظٹ</th><th>ط­ظˆظ‘ظ„طھ ظ„ط£ط¨ظٹ</th><th>طھط§ط±ظٹط® ط§ظ„طھط­ظˆظٹظ„</th></tr></thead>
+      <tbody><tr><td>${fmt(R.rent)}</td><td>${fmt(R.paid)}</td><td>${fmt(Math.max(R.rent-R.paid,0))}</td><td>${R.toDad?'âœ”ï¸ژ':'â€”'}</td><td>${R.dadDate||'â€”'}</td></tr></tbody></table>`;
+  const html=styledDoc(`ظپط§طھظˆط±ط© ط¥ظٹط¬ط§ط± â€” ${months[state.month]} ${state.year}`,body);
+  const caption=`ظپط§طھظˆط±ط© ط§ظ„ط¥ظٹط¬ط§ط± â€” ${months[state.month]} ${state.year}\n${T.name||''} (ط´ظ‚ط© ${apt})`;
+  try{Android.shareHtmlAsImage(html,`invoice_${apt}.png`,caption);}catch(_){alert("ظ…ط´ط§ط±ظƒط© ط§ظ„طµظˆط±ط© طھط­طھط§ط¬ ط§ظ„طھط·ط¨ظٹظ‚ ط§ظ„ط£طµظ„ظٹ.");}
+}
+function printAllMonth(){
+  const b=getBuilding();let rows='',totD=0,totP=0,totR=0;
+  for(let i=1;i<=b.apts;i++){const R=readMonth(b.id,i,state.year,state.month),T=ensureTenant(b.id,i);
+    rows+=`<tr><td>${i}</td><td>${escapeHtml(T.name||'')}</td><td>${fmt(R.rent)}</td><td>${fmt(R.paid)}</td><td>${fmt(Math.max(R.rent-R.paid,0))}</td><td>${R.toDad?'âœ”ï¸ژ':'â€”'}</td><td>${R.dadDate||'â€”'}</td></tr>`;
+    totD+=R.rent;totP+=R.paid;totR+=Math.max(R.rent-R.paid,0);}
+  const body=`<table><thead><tr><th>ط§ظ„ظˆط­ط¯ط©</th><th>ط§ظ„ط§ط³ظ…</th><th>ط§ظ„ط¥ظٹط¬ط§ط±</th><th>ط§ظ„ظ…ط¯ظپظˆط¹</th><th>ط§ظ„ظ…طھط¨ظ‚ظٹ</th><th>ط­ظˆظ‘ظ„طھ ظ„ط£ط¨ظٹ</th><th>طھط§ط±ظٹط® ط§ظ„طھط­ظˆظٹظ„</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="2">ط§ظ„ط¥ط¬ظ…ط§ظ„ظٹ</td><td>${fmt(totD)}</td><td>${fmt(totP)}</td><td>${fmt(totR)}</td><td colspan="2"></td></tr></tfoot></table>`;
+  const html=styledDoc(`${b.name} â€” طھظ‚ط±ظٹط± ط´ظ‡ط±`,body);
+  try{Android.printHtml(html,`طھظ‚ط±ظٹط± ${months[state.month]} ${state.year}`);}catch(_){window.print();}
+}
+function printYearPDF(){
+  const b=getBuilding();let sections='';
+  for(let m=1;m<=12;m++){
+    let rows='',totD=0,totP=0,totR=0;
+    for(let i=1;i<=b.apts;i++){const R=readMonth(b.id,i,state.year,m),T=ensureTenant(b.id,i);
+      rows+=`<tr><td>${i}</td><td>${escapeHtml(T.name||'')}</td><td>${fmt(R.rent)}</td><td>${fmt(R.paid)}</td><td>${fmt(Math.max(R.rent-R.paid,0))}</td><td>${R.toDad?'âœ”ï¸ژ':'â€”'}</td><td>${R.dadDate||'â€”'}</td></tr>`;
+      totD+=R.rent;totP+=R.paid;totR+=Math.max(R.rent-R.paid,0);}
+    sections+=`<div style="margin:18px 0 8px;font-weight:800">${state.year} ${months[m]}</div>
+      <table><thead><tr><th>ط§ظ„ظˆط­ط¯ط©</th><th>ط§ظ„ط§ط³ظ…</th><th>ط§ظ„ط¥ظٹط¬ط§ط±</th><th>ط§ظ„ظ…ط¯ظپظˆط¹</th><th>ط§ظ„ظ…طھط¨ظ‚ظٹ</th><th>ط­ظˆظ‘ظ„طھ ظ„ط£ط¨ظٹ</th><th>طھط§ط±ظٹط® ط§ظ„طھط­ظˆظٹظ„</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="2">ط§ظ„ط¥ط¬ظ…ط§ظ„ظٹ</td><td>${fmt(totD)}</td><td>${fmt(totP)}</td><td>${fmt(totR)}</td><td colspan="2"></td></tr></tfoot></table>`;
+  }
+  const html=styledDoc(`طھظ‚ط±ظٹط± ط³ظ†ط© ظƒط§ظ…ظ„ط© â€” ${b.name}`,sections);
+  try{Android.printHtml(html,`طھظ‚ط±ظٹط± ط³ظ†ط© ${state.year}`);}catch(_){window.print();}
+}
+function persist(showToast=true){localStorage.setItem('ejaratDB',JSON.stringify(DB));if(showToast)toast('طھظ… ط§ظ„ط­ظپط¸ âœ…');}
+function exportBackup(){const text=JSON.stringify(DB,null,2);try{Android.exportJson(text,'backup.json');}catch(_){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'application/json'}));a.download='backup.json';a.click();}}
+function importBackup(){try{Android.importJson();}catch(_){const inp=document.createElement('input');inp.type='file';inp.accept='application/json';inp.onchange=()=>{const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{DB=JSON.parse(r.result);persist(false);toast('طھظ… ط§ظ„ط§ط³طھظٹط±ط§ط¯ âœ…');render();}catch(e){toast('ظ…ظ„ظپ ط؛ظٹط± طµط§ظ„ط­',true);}};r.readAsText(f);};inp.click();}}
+window.onBackupImported=function(text){try{DB=JSON.parse(text);persist(false);toast('طھظ… ط§ظ„ط§ط³طھظٹط±ط§ط¯ âœ…');render();}catch(e){toast('ظ…ظ„ظپ ط؛ظٹط± طµط§ظ„ط­',true);}};
+let toastTimer=null;function toast(t,isErr=false){const b=$('#msg');b.textContent=t;b.className='msg '+(isErr?'err':'ok');b.style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>b.style.display='none',1600);}
+function bindAptEvents(){document.querySelectorAll('.name').forEach(e=>{e.onchange=()=>{ensureTenant(state.building,+e.dataset.apt).name=e.value.trim();persist(false);};});document.querySelectorAll('.phone').forEach(e=>{e.onchange=()=>{ensureTenant(state.building,+e.dataset.apt).phone=e.value.trim();persist(false);};});document.querySelectorAll('.rent').forEach(e=>{e.oninput=()=>recalcRest(+e.dataset.apt);e.onblur=()=>formatOnBlur(e);e.onchange=()=>saveApt(state.building,+e.dataset.apt,false);});document.querySelectorAll('.paid').forEach(e=>{e.oninput=()=>recalcRest(+e.dataset.apt);e.onblur=()=>formatOnBlur(e);e.onchange=()=>saveApt(state.building,+e.dataset.apt,false);});['note','date'].forEach(cls=>{document.querySelectorAll('.'+cls).forEach(e=>{e.onchange=()=>saveApt(state.building,+e.dataset.apt,false);});});document.querySelectorAll('.todad').forEach(e=>{e.onchange=()=>saveApt(state.building,+e.dataset.apt,true);});}
+$('#btnPrintAll').onclick=printAllMonth;$('#btnPdfYear').onclick=printYearPDF;$('#btnExport').onclick=exportBackup;$('#btnImport').onclick=importBackup;$('#btnSaveTop').onclick=()=>persist(true);
+$('#selBuilding').onchange=e=>{state.building=e.target.value;render();};$('#selMonth').onchange=e=>{state.month=+e.target.value;render();};$('#selYear').onchange=e=>{state.year=+e.target.value;render();};$('#qName').oninput=e=>{state.q=e.target.value.trim();renderList();};
+function render(){renderSelectors();renderList();}render();
+</script>
+</body>
+</html>
