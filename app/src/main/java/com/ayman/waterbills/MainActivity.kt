@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Bundle
 import android.print.PrintAttributes
@@ -18,10 +20,18 @@ import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
 
+    companion object {
+        // رابط GitHub Pages الخاص بك
+        private const val HOME_URL = "https://itg0966-cmd.github.io/auman-site/"
+
+        private fun bust(url: String) = url +
+                (if (url.contains("?")) "&" else "?") + "v=" + System.currentTimeMillis()
+    }
+
     private lateinit var webView: WebView
     private var pendingText: String? = null
 
-    // دعم <input type="file"> (لو احتجته من الصفحة)
+    // دعم <input type="file">
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private val fileChooserLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
@@ -57,7 +67,6 @@ class MainActivity : AppCompatActivity() {
                 val uri: Uri? = res.data?.data
                 try {
                     val txt = contentResolver.openInputStream(uri!!)?.reader()?.readText() ?: ""
-                    // استدعِ callback من الجافاسكربت لإسقاط البيانات داخل localStorage
                     webView.evaluateJavascript(
                         "window.onBackupImported && onBackupImported(${txt.js()})",
                         null
@@ -76,7 +85,19 @@ class MainActivity : AppCompatActivity() {
 
         webView = findViewById(R.id.webView)
         configureWebView(webView)
-        webView.loadUrl("file:///android_asset/index.html")
+
+        // تنظيف كاش/كوكيز ليظهر آخر نسخة من الصفحة
+        webView.clearCache(true)
+        webView.clearHistory()
+        CookieManager.getInstance().removeAllCookies(null)
+        CookieManager.getInstance().flush()
+
+        // جرّب الموقع أونلاين، ولو فشل/مافي نت -> افتح النسخة المحلية
+        if (isOnline()) {
+            webView.loadUrl(bust(HOME_URL))
+        } else {
+            webView.loadUrl("file:///android_asset/index.html")
+        }
     }
 
     private fun configureWebView(wv: WebView) {
@@ -90,13 +111,12 @@ class MainActivity : AppCompatActivity() {
             builtInZoomControls = false
             displayZoomControls = false
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            cacheMode = WebSettings.LOAD_NO_CACHE // لا تعتمد على الكاش
         }
 
-        // === دعم alert / confirm / prompt + اختيار ملف ===
+        // alert / confirm / prompt + اختيار ملف
         wv.webChromeClient = object : WebChromeClient() {
-            override fun onJsAlert(
-                view: WebView?, url: String?, message: String?, result: JsResult?
-            ): Boolean {
+            override fun onJsAlert(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
                 AlertDialog.Builder(this@MainActivity)
                     .setTitle("تنبيه")
                     .setMessage(message)
@@ -107,9 +127,7 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
 
-            override fun onJsConfirm(
-                view: WebView?, url: String?, message: String?, result: JsResult?
-            ): Boolean {
+            override fun onJsConfirm(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
                 AlertDialog.Builder(this@MainActivity)
                     .setTitle("تأكيد")
                     .setMessage(message)
@@ -135,13 +153,10 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
 
-            // دعم اختيار الملفات إن استخدمت input[type=file]
             override fun onShowFileChooser(
-                webView: WebView?,
-                filePathCallback: ValueCallback<Array<Uri>>?,
-                fileChooserParams: FileChooserParams?
+                webView: WebView?, filePathCallback: ValueCallback<Array<Uri>>?, fileChooserParams: FileChooserParams?
             ): Boolean {
-                fileChooserCallback?.onReceiveValue(null) // الغِ أي طلب سابق
+                fileChooserCallback?.onReceiveValue(null)
                 fileChooserCallback = filePathCallback
                 val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                     addCategory(Intent.CATEGORY_OPENABLE)
@@ -152,8 +167,17 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // التعامل مع روابط واتساب/خارجية
         wv.webViewClient = object : WebViewClient() {
+
+            // لو حصل خطأ تحميل (انقطاع/404…) نرجع فورًا للنسخة المحلية
+            override fun onReceivedError(
+                view: WebView?, request: WebResourceRequest?, error: WebResourceError?
+            ) {
+                if (request?.isForMainFrame == true) {
+                    view?.loadUrl("file:///android_asset/index.html")
+                }
+            }
+
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url?.toString() ?: return false
                 return handleExternalUrl(url)
@@ -176,9 +200,7 @@ class MainActivity : AppCompatActivity() {
                             addCategory(Intent.CATEGORY_BROWSABLE)
                         })
                         true
-                    } else {
-                        false
-                    }
+                    } else false
                 } catch (e: ActivityNotFoundException) {
                     toast("لا يوجد تطبيق لفتح الرابط"); true
                 } catch (e: Exception) {
@@ -190,14 +212,22 @@ class MainActivity : AppCompatActivity() {
         wv.addJavascriptInterface(Bridge(), "Android")
     }
 
+    // فحص الاتصال
+    private fun isOnline(): Boolean {
+        val cm = getSystemService(ConnectivityManager::class.java)
+        val net = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(net) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
     inner class Bridge {
-        // طباعة الصفحة الحالية كما هي
         @JavascriptInterface
         fun printCurrent(title: String?) {
             runOnUiThread {
                 try {
                     val pm = getSystemService(PRINT_SERVICE) as PrintManager
-                    val adapter: PrintDocumentAdapter = webView.createPrintDocumentAdapter(title ?: "Ejarat")
+                    val adapter: PrintDocumentAdapter =
+                        webView.createPrintDocumentAdapter(title ?: "Ejarat")
                     val attrs = PrintAttributes.Builder()
                         .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
                         .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
@@ -209,7 +239,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // طباعة HTML مُولّد (نستخدمه لفاتورة/سنة الشقة مع نطاق التاريخ)
         @JavascriptInterface
         fun printHtml(html: String, title: String?) {
             runOnUiThread {
@@ -234,7 +263,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // تصدير JSON عبر واجهة SAF (أفضل من التنزيل بالويب في WebView)
         @JavascriptInterface
         fun exportJson(json: String, fileName: String) {
             pendingText = json
@@ -246,7 +274,6 @@ class MainActivity : AppCompatActivity() {
             saveLauncher.launch(intent)
         }
 
-        // استيراد JSON عبر SAF
         @JavascriptInterface
         fun importJson() {
             val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -256,8 +283,7 @@ class MainActivity : AppCompatActivity() {
             openLauncher.launch(intent)
         }
 
-        @JavascriptInterface
-        fun toast(msg: String) = this@MainActivity.toast(msg)
+        @JavascriptInterface fun toast(msg: String) = this@MainActivity.toast(msg)
 
         @JavascriptInterface
         fun goBack() {
@@ -279,7 +305,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
-        if (this::webView.isInitialized && webView.canGoBack()) webView.goBack() else super.onBackPressed()
+        if (this::webView.isInitialized && webView.canGoBack()) webView.goBack()
+        else super.onBackPressed()
     }
 
     private fun toast(msg: String) =
