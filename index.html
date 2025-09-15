@@ -362,6 +362,13 @@ function docHtml(title,body,subtag=''){
     <div class="hdr"><div class="t">${esc(title)}</div><div class="tag">${subtag || (months[state.month]+' '+state.year)}</div></div>
     ${body}
     <div class="note">يجب تسديد الفاتورة خلال اليوم، وفي حال التأخير قد تتعرض الخدمة للإيقاف.</div>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js')
+    .then(() => console.log('✅ Service Worker Registered'))
+    .catch(console.error);
+}
+</script>>
   </body></html>`;
 }
 
