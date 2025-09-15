@@ -92,7 +92,7 @@ a<!doctype html>
   <!-- تسجيل Service Worker مرة واحدة في الصفحة -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').then(reg => {
+      navigator.serviceWorker.register('/auman-site/sw.js').then(reg => {
         if (reg.waiting) showReload();
         reg.addEventListener('updatefound', () => {
           const sw = reg.installing;
