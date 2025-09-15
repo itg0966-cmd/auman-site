@@ -1,62 +1,80 @@
-// 🟠 نسخة جاهزة من Service Worker لتشغيل موقعك أوفلاين
-const CACHE_NAME = 'ayman-cache-v1';
+// ===== Service Worker (بدون ASSETS) =====
+const BASE_PATH  = "/auman-site";       // عدّل لو المستودع غير هذا الاسم
+const CACHE_NAME = "auman-site-v1";     // زِد الرقم عند كل تعديل كبير
 
-// الملفات الأساسية اللي تنحفظ في الكاش (ضيف ملفاتك هنا لو عندك CSS/JS/صور)
-const ASSETS = [
-  './',
-  './index.html',
-  // './style.css',
-  // './app.js',
-  // './images/logo.png',
-];
-
-// عند التثبيت: نخزن الملفات المهمة
-self.addEventListener('install', (event) => {
+// ثبّت SW وحمّل نسخة أولية من الصفحة (اختياري لكن مفيد للأوفلاين)
+self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(ASSETS))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then(c =>
+      c.addAll([
+        `${BASE_PATH}/`,
+        `${BASE_PATH}/index.html`,
+      ]).catch(() => null) // لو فشل التحميل، نكمل عادي
+    )
   );
+  self.skipWaiting();
 });
 
-// عند التفعيل: نحذف أي كاش قديم
-self.addEventListener('activate', (event) => {
+// نظّف الكاشات القديمة
+self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
-      )
-    ).then(() => self.clients.claim())
+    caches.keys().then(keys =>
+      Promise.all(keys.map(k => (k === CACHE_NAME ? null : caches.delete(k))))
+    )
   );
+  self.clients.claim();
 });
 
-// عند أي طلب: نحاول من الشبكة أولاً، ولو فشل نجيب من الكاش
-self.addEventListener('fetch', (event) => {
+// استراتيجية:
+// - لصفحات HTML (التنقل): Network-first مع مهلة، ثم الكاش ثم index.html
+// - لباقي طلبات نفس النطاق: Cache-first ثم الشبكة وتحديث الكاش
+self.addEventListener("fetch", (event) => {
   const req = event.request;
+  const url = new URL(req.url);
 
-  // لو الطلب HTML → شبكة أولاً
-  if (req.headers.get('accept')?.includes('text/html')) {
-    event.respondWith(
-      fetch(req).then((res) => {
-        const resClone = res.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(req, resClone));
-        return res;
-      }).catch(() => caches.match(req).then(r => r || caches.match('./index.html')))
-    );
+  // نتعامل فقط مع نفس النطاق
+  if (url.origin !== location.origin) return;
+
+  // طلبات HTML / تنقل
+  const isPage =
+    req.mode === "navigate" ||
+    (req.headers.get("accept") || "").includes("text/html");
+
+  if (isPage) {
+    event.respondWith(networkFirst(req));
     return;
   }
 
-  // باقي الملفات → كاش أولاً
-  event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req).then((res) => {
-        if (req.method === 'GET' && res.ok) {
-          const resClone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, resClone));
-        }
-        return res;
-      });
-    })
-  );
+  // باقي الملفات (css/js/img…)
+  if (req.method === "GET") {
+    event.respondWith(cacheFirst(req));
+  }
 });
+
+async function networkFirst(req) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 ثواني
+
+  try {
+    const fresh = await fetch(req, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    const cache = await caches.open(CACHE_NAME);
+    cache.put(req, fresh.clone());
+    return fresh;
+  } catch (e) {
+    clearTimeout(timeoutId);
+    const cached = await caches.match(req);
+    if (cached) return cached;
+    // fallback للصفحة الرئيسية
+    return caches.match(`${BASE_PATH}/index.html`);
+  }
+}
+
+async function cacheFirst(req) {
+  const cached = await caches.match(req);
+  if (cached) return cached;
+  const res = await fetch(req);
+  const cache = await caches.open(CACHE_NAME);
+  cache.put(req, res.clone());
+  return res;
+}
