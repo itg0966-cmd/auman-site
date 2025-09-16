@@ -1,6 +1,6 @@
 // ===== Service Worker (بدون ASSETS) =====
 const BASE_PATH  = "/auman-site";       // عدّل لو المستودع غير هذا الاسم
-const CACHE_NAME = "auman-site-v4";     // زِد الرقم عند كل تعديل كبير
+const CACHE_NAME = "auman-site-v5";     // زِد الرقم عند كل تعديل كبير
 
 // ثبّت SW وحمّل نسخة أولية من الصفحة (اختياري لكن مفيد للأوفلاين)
 self.addEventListener("install", (event) => {
