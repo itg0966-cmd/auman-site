@@ -1,4 +1,4 @@
-a<!doctype html>
+<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8"/>
@@ -72,11 +72,11 @@ a<!doctype html>
     @media(max-width:720px){ .hdr-grid{grid-template-columns:1fr 1fr} }
     @media(max-width:560px){ .bgrid{grid-template-columns:1fr 1fr} }
 
-    /* إدخال رقم الشكاوي داخل التاج */
     .tag input.supportIn{
       width:120px; max-width:100%; border:none; outline:none; background:transparent;
       color:#ffead9; font-weight:800; text-align:center;
     }
+    .tag input[type="date"]{background:transparent;color:#ffead9;border:none;outline:none;font-weight:800}
   </style>
 </head>
 <body>
@@ -89,39 +89,26 @@ a<!doctype html>
     <div class="chip" id="btnImport">استيراد ⤵️</div>
   </div>
 
- <script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').then(reg => {
-    // ✅ لما يكتشف نسخة جديدة في الخلفية
-    reg.addEventListener('updatefound', () => {
-      const sw = reg.installing;
-      if (!sw) return;
-
-      sw.addEventListener('statechange', () => {
-        // صارت "installed" ويوجد كنترولر => يعني تحديث جاهز
-        if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-          // ✅ اطلب من الـ SW يتفعّل فوراً
-          if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-        }
+  <script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      reg.addEventListener('updatefound', () => {
+        const sw = reg.installing;
+        if (!sw) return;
+        sw.addEventListener('statechange', () => {
+          if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+            if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
       });
-    });
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!window.__reloadedBySW__) { window.__reloadedBySW__ = true; location.reload(); }
+      });
+      if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    }).catch(console.error);
+  }
+  </script>
 
-    // ✅ إذا تغيّر الكنترولر (يعني النسخة الجديدة استلمت)، أعد التحميل تلقائياً
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      // نتأكد ما نكرر الريلود
-      if (!window.__reloadedBySW__) {
-        window.__reloadedBySW__ = true;
-        location.reload();
-      }
-    });
-
-    // ✅ لو كان فيه تحديث جاهز أصلاً (waiting) من قبل ما ندخل الصفحة
-    if (reg.waiting) {
-      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-    }
-  }).catch(console.error);
-}
-</script>
   <div class="stats"><div>
     <div class="stat">إجمالي المستحق<b id="totDue">0</b></div>
     <div class="stat">إجمالي المدفوع<b id="totPaid">0</b></div>
@@ -147,25 +134,62 @@ if ('serviceWorker' in navigator) {
   const num=v=>Number(String(v||'0').replace(/[^\d.-]/g,''))||0;
   const ym=(y,m)=>`${y}-${String(m).padStart(2,'0')}`;
   function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+  function two(n){ return String(n).padStart(2,'0'); }
 
-  /* قاعدة + حفظ رقم الشكاوي العام */
+  /* قاعدة البيانات */
   const defaultDB={ unitPrice:2000,
     buildings:[ {id:'airport',name:'عمارة المطار',apts:7}, {id:'zayed',name:'عمارة زايد',apts:12} ],
-    tenants:{}, history:{}, supportNo:'' };
+    tenants:{}, history:{}, periods:{}, apPeriods:{}, supportNo:'' };
   let DB=null; try{DB=JSON.parse(localStorage.getItem('ejaratDB'))}catch(_){}
   if(!DB||!DB.buildings){DB=JSON.parse(JSON.stringify(defaultDB));save(false)}
   if(DB.supportNo===undefined) DB.supportNo='';
+  if(!DB.periods) DB.periods={};
+  if(!DB.apPeriods) DB.apPeriods={};
 
   const state={ building:(DB.buildings[0]||{}).id||'airport', month:(new Date().getMonth()+1), year:(new Date().getFullYear()), q:'' }
   const B=()=>DB.buildings.find(b=>b.id===state.building)||DB.buildings[0];
 
   /* تواريخ */
   function lastDayOfMonth(y,m){ return new Date(y,m,0).getDate(); }
-  function two(n){ return String(n).padStart(2,'0'); }
   function fmtDMY(d,m,y){ return `${two(d)}/${two(m)}/${y}`; }
-
-  /* شهر سابق */
   function prevYM(y,m){ return m>1 ? [y,m-1] : [y-1,12]; }
+
+  /* افتراضي الشهر (تديره بطاقة 1 فقط) مع توريث */
+  function getDefaultPeriod(y,m){
+    DB.periods = DB.periods || {};
+    const key = ym(y,m);
+    let p = DB.periods[key];
+    if(!p){
+      let from = `${y}-${two(m)}-01`;
+      let to   = `${y}-${two(m)}-${two(lastDayOfMonth(y,m))}`;
+      const [py,pm]=prevYM(y,m);
+      const prev = DB.periods[ym(py,pm)];
+      if(prev && prev.to){
+        const prevTo = new Date(prev.to);
+        const f = new Date(prevTo); f.setDate(f.getDate()+1);
+        from = `${f.getFullYear()}-${two(f.getMonth()+1)}-${two(f.getDate())}`;
+        const wantedDay = prevTo.getDate();
+        const end = Math.min(wantedDay, lastDayOfMonth(y,m));
+        to = `${y}-${two(m)}-${two(end)}`;
+        if(new Date(from) > new Date(to)){
+          from = `${y}-${two(m)}-01`;
+          to   = `${y}-${two(m)}-${two(lastDayOfMonth(y,m))}`;
+        }
+      }
+      p = {from,to};
+      DB.periods[key]=p; save(false);
+    }
+    return p;
+  }
+
+  /* مدى الشقة: لو فيه تخصيص يرجع، غير كذا يرجّع الافتراضي (بطاقة 1) */
+  function getAptPeriod(bid,i,y,m){
+    if(i===1) return getDefaultPeriod(y,m);
+    DB.apPeriods[bid]=DB.apPeriods[bid]||{};
+    DB.apPeriods[bid][i]=DB.apPeriods[bid][i]||{};
+    const key=ym(y,m);
+    return DB.apPeriods[bid][i][key] || getDefaultPeriod(y,m);
+  }
 
   function ensureTenant(bid,i){ DB.tenants[bid]=DB.tenants[bid]||{}; DB.tenants[bid][i]=DB.tenants[bid][i]||{name:`مستأجر ${i}`,phone:''}; return DB.tenants[bid][i];}
   function ensureM(bid,i,y,m){ DB.history[bid]=DB.history[bid]||{}; DB.history[bid][i]=DB.history[bid][i]||{}; const k=ym(y,m); DB.history[bid][i][k]=DB.history[bid][i][k]||{}; return DB.history[bid][i][k];}
@@ -201,7 +225,7 @@ if ('serviceWorker' in navigator) {
   /* بطاقة */
   function card(i,R,T,b){
     const yearOpts = (()=>{const Y=new Date().getFullYear();return Array.from({length:7},(_,k)=>Y-3+k).map(v=>`<option ${v===state.year?'selected':''} value="${v}">${v}</option>`).join('')})();
-    const endDay = lastDayOfMonth(state.year,state.month);
+    const P = getAptPeriod(b.id,i,state.year,state.month);
     return `<div class="apt">
 
       <div class="bill" id="invoice-${i}">
@@ -217,10 +241,13 @@ if ('serviceWorker' in navigator) {
             </div>
           </div>
 
-          <div class="tag">من: ${state.year}-${two(state.month)}-01</div>
-          <div class="tag">إلى: ${state.year}-${two(state.month)}-${two(endDay)}</div>
+          <div class="tag">من:
+            <input type="date" class="period-from" data-ym="${ym(state.year,state.month)}" data-apt="${i}" value="${P.from}">
+          </div>
+          <div class="tag">إلى:
+            <input type="date" class="period-to" data-ym="${ym(state.year,state.month)}" data-apt="${i}" value="${P.to}">
+          </div>
 
-          <!-- رقم الشكاوي قابل للتعديل -->
           <div class="tag">
             رقم الشكاوي:
             <input class="supportIn support" value="${esc(DB.supportNo||'')}" placeholder="—" />
@@ -306,9 +333,41 @@ if ('serviceWorker' in navigator) {
     document.querySelectorAll('.name').forEach(e=> e.onchange=()=>{ensureTenant(state.building,+e.dataset.apt).name=e.value.trim(); save(false)} );
     document.querySelectorAll('.phone').forEach(e=> e.onchange=()=>{ensureTenant(state.building,+e.dataset.apt).phone=e.value.trim(); save(false)} );
 
-    // حفظ رقم الشكاوي العام من أي كرت
     document.querySelectorAll('.support').forEach(e=>{
       e.onchange=()=>{ DB.supportNo=e.value.trim(); save(false); };
+    });
+
+    /* حفظ مدى الشهر:
+       - apt==1 -> يعدّل الافتراضي للشهر (يعمم على اللي ما عندهم تخصيص)
+       - غير ذلك -> يحفظ تخصيص لنفس الشقة فقط
+    */
+    document.querySelectorAll('.period-from').forEach(e=>{
+      e.onchange=()=>{
+        const k=e.dataset.ym, apt=+e.dataset.apt, bid=state.building;
+        if(apt===1){
+          DB.periods[k]=DB.periods[k]||{}; DB.periods[k].from=e.value;
+        }else{
+          DB.apPeriods[bid]=DB.apPeriods[bid]||{};
+          DB.apPeriods[bid][apt]=DB.apPeriods[bid][apt]||{};
+          DB.apPeriods[bid][apt][k]=DB.apPeriods[bid][apt][k]||{};
+          DB.apPeriods[bid][apt][k].from=e.value;
+        }
+        save(false); render();
+      };
+    });
+    document.querySelectorAll('.period-to').forEach(e=>{
+      e.onchange=()=>{
+        const k=e.dataset.ym, apt=+e.dataset.apt, bid=state.building;
+        if(apt===1){
+          DB.periods[k]=DB.periods[k]||{}; DB.periods[k].to=e.value;
+        }else{
+          DB.apPeriods[bid]=DB.apPeriods[bid]||{};
+          DB.apPeriods[bid][apt]=DB.apPeriods[bid][apt]||{};
+          DB.apPeriods[bid][apt][k]=DB.apPeriods[bid][apt][k]||{};
+          DB.apPeriods[bid][apt][k].to=e.value;
+        }
+        save(false); render();
+      };
     });
 
     document.querySelectorAll('.prev,.curr,.paid').forEach(e=>{
@@ -397,11 +456,12 @@ if ('serviceWorker' in navigator) {
     </body></html>`;
   }
 
-  /* فاتورة (جديد) — يظهر فيها رقم الشكاوي */
+  /* فاتورة الشقة — تستخدم مدى البطاقة نفسها (تخصيص أو افتراضي) */
   function printInvoiceNew(bid,i){
     const R=readM(bid,i,state.year,state.month), T=ensureTenant(bid,i);
-    const start = fmtDMY(1, state.month, state.year);
-    const end = fmtDMY(lastDayOfMonth(state.year,state.month), state.month, state.year);
+    const P=getAptPeriod(bid,i,state.year,state.month);
+    const start = P.from.split('-').reverse().join('/');
+    const end   = P.to.split('-').reverse().join('/');
     const range = `من: ${start} إلى: ${end}`;
     const support = esc(DB.supportNo||'—');
 
@@ -426,7 +486,7 @@ if ('serviceWorker' in navigator) {
     try{Android.printHtml(html,`فاتورة شقة ${i}`)}catch(_){const w=open('','_blank'); if(!w){alert('اسمح بفتح النافذة'); return;} w.document.write(html); w.document.close(); w.focus(); w.print();}
   }
 
-  /* سنة كاملة للشقة */
+  /* سنة كاملة للشقة (كما هي) */
   function printYearApt(bid,i,year){
     year=+year||new Date().getFullYear();
     const T=ensureTenant(bid,i);
@@ -455,19 +515,21 @@ if ('serviceWorker' in navigator) {
     try{Android.printHtml(html,`سنة الشقة ${i} - ${year}`)}catch(_){const w=open('','_blank'); if(!w){alert('اسمح بفتح النافذة'); return;} w.document.write(html); w.document.close(); w.focus(); w.print();}
   }
 
-  /* تقرير شهر لكل الشقق */
+  /* تقرير شهر لكل الشقق — يستخدم افتراضي البطاقة 1 */
   function printAll(){
     const b=B(); let rows='',D=0,P=0,Rm=0;
-    for(let i=1;i<=b.apts;i++){ const r=readM(b.id,i,state.year,state.month), t=ensureTenant(b.id,i);
+    for(let i=1;i<=b.apts;i++){
+      const r=readM(b.id,i,state.year,state.month), t=ensureTenant(b.id,i);
       rows+=`<tr><td>${i}</td><td>${esc(t.name)}</td><td>${fmt(r.prev)}</td><td>${fmt(r.curr)}</td><td>${fmt(r.diff)}</td><td>${fmt(r.amount)}</td><td>${fmt(r.arrears)}</td><td><b>${fmt(r.totalDue)}</b></td><td>${fmt(r.paid)}</td><td>${fmt(r.remain)}</td></tr>`;
       D+=r.totalDue; P+=r.paid; Rm+=r.remain;
     }
+    const Pm=getDefaultPeriod(state.year,state.month);
+    const range = `من: ${Pm.from.split('-').reverse().join('/')} إلى: ${Pm.to.split('-').reverse().join('/')}`;
     const body=`<table>
       <thead><tr><th>الوحدة</th><th>الاسم</th><th>السابقة</th><th>الحالية</th><th>الفرق</th><th>الفترة</th><th>متأخرات</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th></tr></thead>
       <tbody>${rows}</tbody>
       <tfoot><tr><td colspan="7">الإجمالي</td><td>${fmt(D)}</td><td>${fmt(P)}</td><td>${fmt(Rm)}</td></tr></tfoot>
     </table>`;
-    const range = `من: ${fmtDMY(1,state.month,state.year)} إلى: ${fmtDMY(lastDayOfMonth(state.year,state.month),state.month,state.year)}`;
     const html=docHtml(`تقارير شهر`,body,range);
     try{Android.printHtml(html,`تقرير ${months[state.month]} ${state.year}`)}catch(_){const w=open('','_blank'); if(!w){alert('اسمح بفتح النافذة');return;} w.document.write(html); w.document.close(); w.focus(); w.print();}
   }
@@ -503,8 +565,14 @@ if ('serviceWorker' in navigator) {
       if(!file){
         const pasted=prompt('ألصق بيانات النسخة الاحتياطية (JSON):','');
         if(!pasted) return;
-        try{ const incoming=JSON.parse(pasted); if(!incoming.buildings||!incoming.tenants||!incoming.history) throw new Error('بنية الملف غير صحيحة'); DB=incoming; if(DB.supportNo===undefined) DB.supportNo=''; save(false); render(); alert('تم الاستيراد ✅'); }
-        catch(e){ alert('JSON غير صالح: '+e.message); }
+        try{
+          const incoming=JSON.parse(pasted);
+          if(!incoming.buildings||!incoming.tenants||!incoming.history) throw new Error('بنية الملف غير صحيحة');
+          if(incoming.supportNo===undefined) incoming.supportNo='';
+          if(!incoming.periods) incoming.periods={};
+          if(!incoming.apPeriods) incoming.apPeriods={};
+          DB=incoming; save(false); render(); alert('تم الاستيراد ✅');
+        }catch(e){ alert('JSON غير صالح: '+e.message); }
         return;
       }
       const r=new FileReader();
@@ -515,6 +583,8 @@ if ('serviceWorker' in navigator) {
             throw new Error('بنية الملف غير صحيحة');
           }
           if(incoming.supportNo===undefined) incoming.supportNo='';
+          if(!incoming.periods) incoming.periods={};
+          if(!incoming.apPeriods) incoming.apPeriods={};
           DB=incoming; save(false); render();
           alert('تم الاستيراد ✅');
         }catch(e){ alert('ملف غير صالح: '+e.message); }
